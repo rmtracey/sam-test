@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  sam-slack-test
+
+  Sample SAM Template for sam-slack-test
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 3
+    Runtime: nodejs8.10
+    Environment:
+      Variables:
+        SLACK_OAUTH: xoxp-278046356325-278046357349-567267738789-f5522cf612cadf1d3f4721ca088927e7
+  Api:
+    Cors:
+      AllowMethods: "'*'"
+      AllowHeaders: "'*'"
+      AllowOrigin: "'*'"
+    MethodSettings:
+      - LoggingLevel: INFO
+        MetricsEnabled: True
+        DataTraceEnabled: True
+        ResourcePath: /*
+        HttpMethod: '*'
+
+Resources:
+  OpenDialogFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: src/
+      Handler: openDialog.handler
+      Events:
+        OpenDialog:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /openDialog
+            Method: post
+  InteractiveFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: src/
+      Handler: interactive.handler
+      Events:
+        Interactive:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /interactive
+            Method: post
+      Environment:
+        Variables:
+          SNS_ARN: !Ref DbPutSns
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt DbPutSns.TopicName
+  DbPutFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: src/
+      Handler: dbPut.handler
+      Events:
+        DbPut:
+          Type: SNS
+          Properties:
+            Topic: !Ref DbPutSns
+      Environment:
+        Variables:
+          DB_TABLE_NAME: !Ref SamTestTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SamTestTable
+  DbPutSns:
+    Type: AWS::SNS::Topic
+  SamTestTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: date
+          AttributeType: N
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+        - AttributeName: date
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+# Outputs:
+#   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+#   # Find out more about other implicit resources you can reference within SAM
+#   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+#   HelloWorldApi:
+#     Description: 'API Gateway endpoint URL for Prod stage for Hello World function'
+#     Value: !Sub 'https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/'
+
+#   HelloWorldFunction:
+#     Description: 'Hello World Lambda Function ARN'
+#     Value: !GetAtt HelloWorldFunction.Arn
+
+#   HelloWorldFunctionIamRole:
+#     Description: 'Implicit IAM Role created for Hello World function'
+#     Value: !GetAtt HelloWorldFunctionRole.Arn
